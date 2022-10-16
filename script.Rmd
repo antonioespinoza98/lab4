@@ -1,0 +1,257 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
+---
+
+# DISEÑOS ANIDADOS
+
+En este laboratorio se presentan dos ejercicios con factores anidados.
+Los dos ejercicios tienen una estructura similar. En el primer ejercicio
+llamado *Escuelas*, el factor fijo instructor está anidado dentro del
+factor fijo escuela, mientras que en el segundo llamado *Cemento*, el
+factor aleatorio barrica está anidado dentro del factor aleatorio `lote`
+
+Cuando los factores son fijos se puede usar la función `lm` con una
+instrucción especial para indicar el anidamiento, y cuando los factores
+son aleatorios se utiliza la función lmer de la librería lme4 (Bates et
+al., 2015).
+
+# Escuelas
+
+Una compañía manufacturera tiene tres escuelas de mecánica regionales,
+una en cada una de sus regiones de operación. Cada escuela tiene dos
+instructores que dan cursos de tres semanas a 15 mecánicos
+aproximadamente. La compañía está interesada en conocer el efecto de la
+escuela (factor A) y el instructor (factor B) en el aprendizaje logrado.
+Se hace un experimento en el que se forman grupos en cada región y se
+asigna cada grupo a uno de los instructores. A cada instructor se le
+asignan dos grupos. Para determinar el efecto de la escuela y el
+instructor en el aprendizaje, se hace una prueba a los estudiantes y se
+obtiene el puntaje promedio del grupo como variable respuesta.
+
+# Ejercicios
+
+1.  Lea los datos del archivo escuelas.Rdata. Defina escuela como factor. Ponga nombres a las escuelas: Región K (1), Región D (2) y Central (3). Observe que hay dos variables para referirse a los instructores: instructor tiene valores 1 y 2 para los instructores de todas las escuelas, mientras que instructor1 no repite el número del instructor en diferentes escuelas, por lo que los instructores van del 1 al 6. Redefina esas dos variables como factor.
+
+```{r}
+load('escuelas.Rdata')
+
+head(base)
+
+# puntaje, escuela, instructor, instructor1, replica
+
+base$escuela <- factor(base$escuela)
+levels(base$escuela) <- c('Región K (1)', 'región D (2)', 'Central (3)')
+
+base$instructor <- factor(base$instructor);base$instructor1 <- factor(base$instructor1)
+```
+    
+    
+Haga una representación gráfica de los datos para ver el comportamiento de la respuesta según escuela e instructor. Use la función dotplot en la librería lattice de la siguiente forma: dotplot(puntaje ~ instructor | escuela). Hágalo usando tanto instructor como instructor1 y vea cuál de las dos formas es más conveniente.
+
+```{r}
+par(mfrow = c(2,2))
+library(lattice)
+dotplot(puntaje ~ instructor | escuela, data = base)
+dotplot(puntaje ~ instructor1 | escuela, data = base)
+
+par(mfrow = c(1,2))
+```
+
++ Yo diría que con instructor1 es mejor porque la variabilidad inter-sujeto es parecida para cada región. Mientras que para el caso de instructor los puntajes para región 1 y región 2 son muy distintos.
+
+¿Se puede esperar que exista interacción entre el instructor y la escuela?
+Comente si se espera que haya un efecto del instructor  sobre el puntaje promedio dentro de cada escuela?
+
++ Para el caso de instructor esperaría que hubiera interacción entre el instructor y la escuela porque el puntaje varía mucho para cada los instructores. Consecuentemente, para instructor 1 esperaría que no hubiese interacción puesto que los puntajes son bastantes parecidos.
+
++ Podemos esperar un efecto del instructor sobre el puntaje promedio dentro de cada escuela.
+
++ Bonus point: No puede haber interacción puesto que es un modelo anidado.
+
+Busque una forma de analizar gráficamente las diferencias entre escuelas. ¿Qué se puede concluir?
+
+```{r}
+xyplot(puntaje ~ escuela, groups = instructor, type = c("p","a"), auto.key = list(columns = 2), ylab = "Puntaje", data = base)
+```
+
++ Podríamos concluir que, las diferencias entre escuelas es bastante notorio para cada escuela, la línea por ejemplo para instructor 1 sube y luego baja y luego vuelve a subir. 
+
+2. Efectos de instructor:
+• Obtenga manualmente los efectos de instructor dentro de escuela.
+
+```{r}
+mu_ij <- tapply(base$puntaje,list(base$instructor, base$escuela), mean)
+mu_i <- tapply(base$puntaje, base$escuela, mean)
+
+beta_11 <- mu_ij[1,1] - mu_i[1]  
+beta_21 <- mu_ij[2,1] - mu_i[1]
+#--
+beta_12 <- mu_ij[1,2] - mu_i[2]
+beta_22 <- mu_ij[2,2] - mu_i[2]
+# --
+beta_13 <- mu_ij[1,3] - mu_i[3]
+beta_23 <- mu_ij[2,3] - mu_i[3]
+
+efectos = matrix(c(beta_11,beta_21,beta_12,beta_22,beta_13,beta_23), ncol = 2,byrow = TRUE, dimnames = list('escuela' = c('1','2','3'),'instructor' = c('1','2') ))
+```
+
+
+• Obtenga manualmente la suma de cuadrados de instructor dentro de escuela.
+
+$$SCInst(Escuela) = r_3 \sum \sum ( \bar{y}_{ij} - \bar{y}_i)^2$$
+
+```{r}
+table(base$instructor, base$escuela)
+
+scint = 2*sum(efectos^2)
+```
+
+
+• ¿Cuántos grados de libertad tiene el factor anidado instructor?
+
++ Si son 2 instructores en 3 escuelas, y dos replicas entonces tendríamos 1 para cada instructor, o sea 1 por cada escuela, lo que sería 3 grados de libertad.
+
+• Calcule el cuadrado medio de instructor dentro de escuela y explique su significado.
+
+```{r}
+scint/3
+```
+
+Esta es una estimación de la variabilidad entre promedios obtenidos por los instructores de cada escuela.
+
+3. Comparación de instructores.
+
+• Establezca con palabras la hipótesis nula al comparar los instructores.
+
++ No existen diferencias entre los promedios de los instructores dentro de cada escuela.
+
++ Existe al menos una diferencia entre los promedios de los instructores dentro de cada escuela.
+
+• Se puede usar el factor anidado con el formato en que aparece instructor, pero indicando la estructura
+anidada dentro de la función lm de la siguiente forma: lm(puntaje~escuela+escuela/instructor).
+De esta forma se indica que el factor instructor está anidado dentro del factor escuela. Use el modelo
+de suma nula y llámelo mod5.
+
+```{r}
+# Cambie al modelo de suma nula usando la siguiente instrucción:
+options(contrasts=c("contr.sum","contr.poly"))
+# Para volver al modelo de tratamiento referencia se usa:
+# options(contrasts=c("contr.treatment","contr.poly"))
+
+mod5 <- lm(puntaje ~ escuela + escuela/instructor, data = base)
+```
+
+
+• Obtenga el anova del modelo anidado y note que tiene una línea que parece una interacción que dice escuela:instructor, pero que en realidad debería leerse instructor(escuela), es decir, instructor dentro de escuela.
+
+```{r}
+anova(mod5)
+```
+
+• Observe el cuadrado medio de instructor y compárelo con el obtenido anteriormente. ¿Se rechaza la
+hipótesis nula referente al instructor?
+
+- Es el mismo cuadrado medio
+
+• Obtenga los efectos de instructor.
+
+```{r}
+model.tables(aov(mod5))
+```
+
+- Obtenemos los mismos efectos de instructor
+
+Comparaciones entre instructores:
+
+• Obtenga los coeficientes del modelo.
+
+```{r}
+betas <- mod5$coefficients
+```
+
+
+• ¿A qué corresponden los últimos 3 coeficientes?
+
+```{r}
+betas
+```
+
+- Los últimos 3 coeficientes son para escuela 1, 2 y 3 los efectos para instructor 1. Recordemos que la restricción es el instructor 2.
+
+• Haga las comparaciones que tengan *sentido* entre los instructores. No tiene sentido comparar todos los pares de instructores, puesto que no todos pertenecen a las mismas escuelas. Por ejemplo, no tiene sentido comparar un instructor de la Región D con un instructor de la Región K. Use la corrección de Bonferroni con un nivel de significancia de 0.10 y confianza de 90%.
+
+$$\mu_{ij}=\mu + \alpha_i + \beta_{j(i)}$$
+
+
+```{r}
+# Recordemos que son diferencias marginales
+
+c1 = c(2, 0, 0)
+c2 = c(0, -2, 0)
+c3 = c(0, 0, 2)
+
+contr = cbind(c1, c2, c3)
+L = t(contr) %*% mod5$coef[4:6]
+ee = sqrt(diag(t(contr) %*% vcov(mod5)[4:6, 4:6] %*% contr))
+t = L / ee
+p = pt(t, 6, lower.tail = F)
+row.names(p) = c("K1-K2", "D2-D1", "C1-C2")
+round(p, 3)
+
+qt = qt(0.9, 6)
+LIM = L - qt * ee
+row.names(LIM) = row.names(p)
+round(LIM, 1)
+```
+
++ En la región K, el puntaje promedio del instructor 1 es al menos 10.7 puntos mayor que el del instructor 2, en la región D el puntaje promedio del instructor 2 es al menos 7.7 puntos mayor que el del instructor 1, y en la región central el puntaje promedio del instructor 1 es al menos 11.2 puntos mayor que el del instructor 2. 
+
+6. Haga las comparaciones entre las diferentes escuelas usando Tukey con 10% de significancia en pruebas
+de una cola.
+
+```{r}
+tapply(base$puntaje, base$escuela, mean)
+
+# Comparamos 1 contra 2, 1 contra 3 y 2 contra 3
+
+region1 = c(1,0)
+region2 = c(0,1)
+region3 = c(-1,-1)
+
+reg12 = region1 - region2
+reg13 = region1 - region3
+reg23 = region2 - region3
+
+contri = cbind(reg12,reg13,reg23)
+
+L = t(contri) %*% mod5$coefficients[2:3]
+
+ee = sqrt(diag(t(contri) %*% vcov(mod5)[2:3, 2:3] %*% contri))
+
+q = L / ee
+ptukey(q * sqrt(2), 3, 6, lower.tail = F)
+```
+
+
+
+• Obtenga cotas inferiores de 90% de confianza para la diferencia de medias entre los pares de escuelas en
+que encontró diferencias.
+
+
+```{r}
+t=qt(1-0.10/2,6)
+LIM = L[-3] - t * ee[-3]
+names(LIM) = c("K-D", "K-Central")
+round(LIM, 2)
+```
+
++ Con 90% de confianza se puede esperar que el puntaje promedio de la región K  esté al menos 1.86 puntos sobre el de la región D, y al menos 5.11 puntos sobre el de la región central
+
+7. ¿Cómo se alteran las conclusiones si se considera que hay muchos instructores en cada región y en el experimento los que participaron fueron una muestra?
+
++ Habría que considerar la escuela y el instructor como aleatorios.
+
