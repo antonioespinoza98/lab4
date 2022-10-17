@@ -68,6 +68,8 @@ Comente si se espera que haya un efecto del instructor  sobre el puntaje promedi
 
 + Para el caso de instructor esperaría que hubiera interacción entre el instructor y la escuela porque el puntaje varía mucho para cada los instructores. Consecuentemente, para instructor 1 esperaría que no hubiese interacción puesto que los puntajes son bastantes parecidos.
 
++ Diríamos que hay homocedasticidad
+
 + Podemos esperar un efecto del instructor sobre el puntaje promedio dentro de cada escuela.
 
 + Bonus point: No puede haber interacción puesto que es un modelo anidado.
@@ -75,7 +77,7 @@ Comente si se espera que haya un efecto del instructor  sobre el puntaje promedi
 Busque una forma de analizar gráficamente las diferencias entre escuelas. ¿Qué se puede concluir?
 
 ```{r}
-xyplot(puntaje ~ escuela, groups = instructor, type = c("p","a"), auto.key = list(columns = 2), ylab = "Puntaje", data = base)
+#xyplot(puntaje ~ escuela, groups = instructor, type = c("p","a"), auto.key = list(columns = 2), ylab = "Puntaje", data = base)
 ```
 
 + Podríamos concluir que, las diferencias entre escuelas es bastante notorio para cada escuela, la línea por ejemplo para instructor 1 sube y luego baja y luego vuelve a subir. 
@@ -142,7 +144,7 @@ options(contrasts=c("contr.sum","contr.poly"))
 # Para volver al modelo de tratamiento referencia se usa:
 # options(contrasts=c("contr.treatment","contr.poly"))
 
-mod5 <- lm(puntaje ~ escuela + escuela/instructor, data = base)
+mod5 <- lm(puntaje ~ escuela + escuela/instructor1, data = base)
 ```
 
 
@@ -151,6 +153,8 @@ mod5 <- lm(puntaje ~ escuela + escuela/instructor, data = base)
 ```{r}
 anova(mod5)
 ```
+
+- En al menos una escuela, hay diferencias entre los promedios de los instructores dentro de cada escuela.
 
 • Observe el cuadrado medio de instructor y compárelo con el obtenido anteriormente. ¿Se rechaza la
 hipótesis nula referente al instructor?
@@ -206,6 +210,8 @@ qt = qt(0.9, 6)
 LIM = L - qt * ee
 row.names(LIM) = row.names(p)
 round(LIM, 1)
+
+# Son 1 comparaciones entre sí, pero solo tenemos una comparación, pero si hubiera 3 o más profesores entonces hay que hacer la correción de Bonferroni
 ```
 
 + En la región K, el puntaje promedio del instructor 1 es al menos 10.7 puntos mayor que el del instructor 2, en la región D el puntaje promedio del instructor 2 es al menos 7.7 puntos mayor que el del instructor 1, y en la región central el puntaje promedio del instructor 1 es al menos 11.2 puntos mayor que el del instructor 2. 
@@ -234,6 +240,8 @@ ee = sqrt(diag(t(contri) %*% vcov(mod5)[2:3, 2:3] %*% contri))
 
 q = L / ee
 ptukey(q * sqrt(2), 3, 6, lower.tail = F)
+
+# Es Tuckey porque son 3 escuelas. También la raíz se hace la correción
 ```
 
 
@@ -254,4 +262,86 @@ round(LIM, 2)
 7. ¿Cómo se alteran las conclusiones si se considera que hay muchos instructores en cada región y en el experimento los que participaron fueron una muestra?
 
 + Habría que considerar la escuela y el instructor como aleatorios.
+
+# Cemento
+
++ Todos son aleatorios, pero si por ejemplo solo saco 1 entonces deja de ser aleatorio
+
+1. Justifique si los factores están cruzados o anidados
+
++ Anidados porque los niveles del factor son diferentes para cada lote. 
+
+```{r}
+load('cemento.Rdata')
+```
+
+Cruzar las dos variables y hacer una nueva variable llamado `saco1`usando la combianción de ambas variables
+
+```{r}
+head(base)
+
+base$saco1 <- base$lote:base$saco
+
+table(base$saco, base$lote)
+```
+
+
+```{r}
+library(lattice)
+
+dotplot(resist ~ saco|lote, data = base)
+```
+
+
+```{r}
+qplot(lote,resist,geom='boxplot', ylab = 'resistencia')
+```
+
+$$y_{ij}= \beta_0 + \tau_i + \delta_j(i) + \epsilon_{ijk}$$
+
+Analice las fuentes variablidad
+
+```{r}
+library(lme4)
+
+mod0 = lmer(resist ~ 1 + (1|saco1) + (1|lote), data = base)
+
+summary(mod0)
+
+# Como es anidado esa variable tiene que ir anidado
+
+ # los puntos están muy pegados, mientras que en algunos sacos vimos mucha varianza
+
+# Sacar la varianza de lote a lote
+var(tapply(base$resist, base$lote, mean) - mean(base$resist))
+
+```
+
+```{r}
+mod = lmer(resist ~ 1 + (1|saco), data = base)
+
+summary(mod)
+```
+
+```{r}
+meds = tapply(base$resist, base$saco1, mean)
+
+lote1 = rep(1:10, each = 3)
+
+tapply(meds, lote1, var)
+
+var(meds)
+```
+
+```{r}
+1 -pf(27.545,17.545,9,20)
+```
+
+# parcelas divididas
+
+
+
+
+
+
 
